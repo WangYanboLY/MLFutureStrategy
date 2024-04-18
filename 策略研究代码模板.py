@@ -8,10 +8,13 @@ from tqdm.contrib.concurrent import process_map
 from 回测函数包 import *
 from functools import partial
 import warnings
-warnings.filterwarnings("ignore")
 from multiprocessing import Pool, cpu_count
 from functools import partial
+from datetime import datetime
 
+import os
+
+os.environ['PYDEVD_DISABLE_FILE_VALIDATION'] = '1'
 
 if __name__ == "__main__":
     feature_compute_funcs = [
@@ -60,11 +63,10 @@ if __name__ == "__main__":
     #
     # # 在第一次计算之后，建议将计算好指标的数据集存储起来，后面直接读取计算会节省很多时间
     # df.to_csv(r"C:\\Users\\Administrator\\Desktop\\人工智能多指标选期策略2.0\\人工智能多指标选期策略\\标记了换月日的已经连续化的日级数据指标已经计算(去未来）.csv")
-    df_path = r"C:\\Users\\Administrator\\Desktop\\MLBasedFuturesStrategy\\MLBasedFuturesStrategy\\Dataset\\指标已计算\\dataset.csv"
-    df = pd.read_csv(df_path)
+    df = pd.read_csv("Dataset/指标已计算/dataset.csv")
 
     df['date'] = pd.to_datetime(df['date'])
-    print("特征计算已完成")
+    # print("特征计算已完成")
 
     # 删去换月前后两日以及周五，注意保留data这个原始数据集
     df = df.loc[df['huanyue'] != 1]
@@ -73,15 +75,14 @@ if __name__ == "__main__":
     print("已删除所有周五和所有换月日")
 
     # 根据斯皮尔曼系数以及缺失值多少进行指标筛选
-    ic = cf.information_coefficient(df, feature_list=feature_names)
-    features = cf.factor_filter_double(df, ic, number_bar=0.1, top_n=15, ic_bar=0.07125)
-    # print(features)
-    print("指标筛选已完成")
+    # ic = cf.information_coefficient(df, feature_list=feature_names)
+    # features = cf.factor_filter_double(df, ic, number_bar=0.1, top_n=15, ic_bar=0.07125)
+    # # print(features)
+    # print("指标筛选已完成")
 
     # 读取期货id
     futures_name = df['id'].unique()
     diction_model = []
-    results = []
     for name in futures_name:
         # 读取指标名称
         '''changed'''
@@ -105,6 +106,7 @@ if __name__ == "__main__":
         threshold = int(0.99 * len(df_subset))
         if threshold <= 287:
             # 如果某品种过往数据太少，这个品种将不参与运算
+            print("当前品种交易数据太少")
             continue
         else:
             df_subset['label'] = np.where(df_subset.index.isin(df_subset.index[:287]), -1, 1)
@@ -124,7 +126,7 @@ if __name__ == "__main__":
     print('滚动训练已结束,即将开始回测')
 
     # 读取未进行换月连续化的数据，提高回测的准确性
-    data_path = r"C:\\Users\\Administrator\\Desktop\\MLBasedFuturesStrategy\\MLBasedFuturesStrategy\\Dataset\\未连续化\\标记了换月日的未连续化的日级数据.csv"
+    data_path = r"Dataset/未连续化/标记了换月日的未连续化的日级数据.csv"
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     result = data.merge(prediction[['id', 'date', 'label', 'prediction']], on=['id', 'date'], how='left')
@@ -134,6 +136,9 @@ if __name__ == "__main__":
     print(signals)
     # 使用等市值函数将开仓手数进行等市值处理
     signals = equal_weight(signals, 80000)
-    signals.to_csv('C:\\Users\\Administrator\\Desktop\\人工智能多指标选期策略2.0\\人工智能多指标选期策略\\回测开仓信号2.0.csv')
+    timenow = datetime.now()
+    timestamp_str = timenow.strftime("%Y-%m-%d_%H-%M-%S") 
+    save_path = f"records/{timestamp_str}_开仓信号.csv"  
+    signals.to_csv(save_path)
     # 输出回测结果
     backtest(800000, signals)
