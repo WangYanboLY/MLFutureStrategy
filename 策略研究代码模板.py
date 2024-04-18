@@ -138,7 +138,7 @@ if __name__ == "__main__":
     signals = equal_weight(signals, 80000)
     timenow = datetime.now()
     timestamp_str = timenow.strftime("%Y-%m-%d_%H-%M-%S") 
-    save_path = f"records/{timestamp_str}_开仓信号.csv"  
+    save_path = f"records/{timestamp_str}/开仓信号.csv"  
     signals.to_csv(save_path)
     # 输出回测结果
     backtest(800000, signals)
