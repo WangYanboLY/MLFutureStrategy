@@ -10,7 +10,7 @@ import math
 
 import pandas as pd
 
-contract = pd.read_csv('C:\\Users\\Administrator\\Desktop\\MLBasedFuturesStrategy\\MLBasedFuturesStrategy\\combined_data.csv', encoding='utf-8')
+contract = pd.read_csv('Dataset/combined_data.csv', encoding='utf-8')
 
 
 def get_future_data(df, date, code):
