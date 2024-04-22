@@ -229,7 +229,7 @@ def equal_weight(data, market_value):
             row['Direction'] = row['Direction']  # 可以在这里添加你的逻辑
         else:
             row['Direction'] = row['Direction'] * int(market_value / commission_value)
-        row['Position'] = abs(row['Direction']) * get_future_data(contract,row['Open_Time'],row['Asset'])['deposit']*get_future_data(contract,row['Open_Time'],row['Asset'])['contract_multiplier'] * row['Open_Price']
+        row['Position'] = abs(row['Direction']) * get_future_data(contract,row['Open_Time'],row['Asset'])['deposit']
         return row
 
     # 在这里设置 axis=1 以对行应用函数
@@ -246,7 +246,7 @@ def equal_weight_l(data, market_value, bar):
             row['Direction'] = row['Direction'] * int(market_value / commission_value) * 2
         else:
             row['Direction'] = row['Direction'] * int(market_value / commission_value)
-        row['Position'] = abs(row['Direction']) * get_future_data(contract,row['Open_Time'],row['Asset'])['deposit']*get_future_data(contract,row['Open_Time'],row['Asset'])['contract_multiplier'] * row['Open_Price']
+        row['Position'] = abs(row['Direction']) * get_future_data(contract,row['Open_Time'],row['Asset'])['deposit']
         return row
 
     # 在这里设置 axis=1 以对行应用函数
