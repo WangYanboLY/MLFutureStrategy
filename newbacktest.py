@@ -277,4 +277,4 @@ def prediciton_weight(data, market_value):
     data = data.apply(hands_calculate, axis = 1)
     data = data.apply(weighted_hands, axis = 1)
 
-    return datanew
+    return data
