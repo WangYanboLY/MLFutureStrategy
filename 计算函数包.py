@@ -248,7 +248,8 @@ def signals_day(data, opening):
     # 该产生交易记录的函数仅针对AI多指标选期策略，其他策略请针对性写作其他函数
 
     signals = pd.DataFrame(
-        columns=["Asset", "Open_Time", "Open_Price", "Direction", "Close_Time", "Close_Price", "Predicted_Return", "Position"])
+        columns=["Asset", "Open_Time", "Open_Price", "Direction", "Close_Time", 
+                 "Close_Price", "Predicted_Return", "Position"])
     for stock_id in data['id'].unique():
         data_copy = data.loc[data['id'] == stock_id]
         for i in range(len(data_copy) - 1):  # Subtract 1 to avoid index out-of-range on the last iteration
@@ -263,8 +264,7 @@ def signals_day(data, opening):
                 one_signals.loc[0, "Asset"] = next_row['id']
                 one_signals.loc[0, "Open_Time"] = next_row['date']
                 one_signals.loc[0, "Open_Price"] = next_row['open']
-                one_signals.loc[0, "Direction"] = np.sign(row['prediction'])
-                # 从DataFrame中选取这些索引对应的行
+                one_signals.loc[0, "Direction"] = np.sign(row['prediction']) 
                 one_signals.loc[0, "Close_Time"] = next_row['date']
                 one_signals.loc[0, "Close_Price"] = next_row['close']
                 one_signals.loc[0, "Predicted_Return"] = row['prediction']
@@ -273,6 +273,45 @@ def signals_day(data, opening):
 
     return signals
 
+def new_signals_day(data, opening):
+    # 训练结束后，使用这份文件产生交易记录
+    # 该产生交易记录的函数仅针对AI多指标选期策略，其他策略请针对性写作其他函数
+
+    signals = pd.DataFrame(
+        columns=["Asset", "Open_Time", "Open_Price", "Direction", "Close_Time", 
+                 "Close_Price", "Predicted_Return", "Position", "Real_direction"])
+    for stock_id in data['id'].unique():
+        count = 0
+        count_win = 0
+        win_rate = 1
+        data_copy = data.loc[data['id'] == stock_id]
+        for i in range(len(data_copy) - 1):  # Subtract 1 to avoid index out-of-range on the last iteration
+            row = data_copy.iloc[i]
+            next_row = data_copy.iloc[i + 1]
+            if abs(row['prediction']) >= opening:
+                count = count + 1
+                # 最后生成的交易记录有6列，依次记录了标的名称，开仓时间，开仓价格，开仓方向，平仓时间，平仓价格
+                one_signals = pd.DataFrame(
+                    columns=["Asset", "Open_Time", "Open_Price", "Direction", 
+                             "Close_Time", "Close_Price", "Predicted_Return", "Position", "Real_direction"])
+
+                one_signals.loc[0, "Asset"] = next_row['id']
+                one_signals.loc[0, "Open_Time"] = next_row['date']
+                one_signals.loc[0, "Open_Price"] = next_row['open']
+                one_signals.loc[0, "Real_direction"] = next_row['real_direction']
+                outcomes = [-1, 1]  # 0 for loss, 1 for win
+                rv = np.random.choice(outcomes, p=[1-win_rate, win_rate])
+                one_signals.loc[0, "Direction"] = np.sign(row['prediction']) * rv
+                if one_signals.loc[0, "Direction"] == one_signals.loc[0, 'Real_direction']:
+                    count_win = count_win + 1
+                one_signals.loc[0, "Close_Time"] = next_row['date']
+                one_signals.loc[0, "Close_Price"] = next_row['close']
+                one_signals.loc[0, "Predicted_Return"] = row['prediction']
+                one_signals.loc[0, "Position"] = 0
+                win_rate = count_win / count
+                signals = pd.concat([signals, one_signals], ignore_index=True)
+
+    return signals
 
 def count_indicators_usage(df):
     """
