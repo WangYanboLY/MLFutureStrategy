@@ -3,6 +3,12 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import Lasso
 from scipy.stats import spearmanr
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.svm import SVC
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Qt5Agg')
+
 
 from sklearn.preprocessing import MinMaxScaler
 # from tensorflow.keras.models import Sequential
@@ -384,3 +390,102 @@ def count_indicators_usage(df):
 #         df.loc[index, 'prediction'] = model.predict(np.array([current_X]))
 
 #     return df
+
+
+def svm_rolling(df, length):
+    # 滚动训练所用函数， 将模型改成别的可以使用SVM之外的其他模型
+    # 使用样本点数为length的训练集滚动训练
+    features_delete = ['id', 'date', 'returns', 'label', 'prediction', 'returns_sign']
+    # 确定特征列
+    features = list(set(df.columns) - set(features_delete))
+
+    ratio_up = 0.5
+    for index, row in df.loc[df['label'] == 1].iterrows():
+
+        past_df = df[df.index < index] 
+        ratio_up = past_df['returns_sign'].sum() / (2 *len(past_df)) + 0.5
+        # Apr01
+        # start_index = index - 286
+        # end_index = index
+        # past_df = df.loc[start_index:end_index-1]
+        features = list(set(past_df.columns) - set(features_delete))
+
+        past_feature_df = past_df[features]
+        past_return = past_df['returns']
+        correlations = {}
+        # 对每一列计算等级相关系数
+        for column in past_feature_df.columns:
+            # 计算等级相关系数
+            corr, _ = spearmanr(past_feature_df[column], past_return)
+            # 将结果存储在字典中
+            correlations[column] = corr
+        features = [feature for feature, correlation in 
+                    correlations.items() if abs(correlation) > 0.07]
+        if len(features) == 0:
+            df.loc[index, 'prediction'] = np.random.choice([-1, 1], p=[1-ratio_up, ratio_up])
+            continue
+        # 训练模型
+        model = SVC()
+        training_end_position = df.index.get_loc(index)
+        if len(df.loc[:training_end_position]) <= length:
+            model.fit(df[features].iloc[:training_end_position], 
+                      df['returns_sign'].iloc[:training_end_position])
+        else:
+            model.fit(df[features].iloc[training_end_position - length:training_end_position]
+                      , df['returns_sign'].iloc[training_end_position - length:training_end_position])
+        # 记录预测结果
+        df_prediction = pd.DataFrame([row[features]], columns=features)
+        df.loc[index, 'prediction'] = model.predict(df_prediction)
+    return df
+
+
+def lasso_regression_classification(df, length, alpha):
+    features_delete = ['id', 'date', 'returns', 'label', 'prediction', 'returns_sign']
+    features = list(set(df.columns) - set(features_delete))
+    correct_rate = []
+    for index, row in df.loc[df['label'] == 1].iterrows():
+        start_index = index - 286
+        end_index = index
+        past_df = df.loc[start_index:end_index-1]
+        # past_df = df[df.index < index] 
+        features = list(set(past_df.columns) - set(features_delete))
+
+        past_feature_df = past_df[features]
+        past_return = past_df['returns']
+        correlations = {}
+
+        for column in past_feature_df.columns:
+            corr, _ = spearmanr(past_feature_df[column], past_return)
+            correlations[column] = corr
+        # Use Lasso regression
+        model = Lasso(alpha) 
+        # features = [feature for feature, correlation in correlations.items() if abs(correlation) > 0.07125]
+        # if len(features) == 0:
+        #     continue
+        training_end_position = df.index.get_loc(index)
+
+        if len(df.loc[:training_end_position]) <= length:
+            model.fit(df[features].iloc[:training_end_position], df['returns'].iloc[:training_end_position])
+        else:
+            model.fit(df[features].iloc[training_end_position - length:training_end_position],
+                      df['returns'].iloc[training_end_position - length:training_end_position])
+
+        df_prediction = pd.DataFrame([row[features]], columns=features)
+        df.loc[index, 'prediction'] = np.sign(model.predict(df_prediction))
+
+        correct_rate.append(past_df['returns_sign'].sum()  / (2 * len(past_df)) + 0.5)
+        # coef = model.coef_
+
+        # Count non-zero coefficients (i.e., features used by the model)
+        # num_features_used = np.sum(coef != 0)
+
+        # print(f"Number of features used: {num_features_used}")
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(correct_rate, marker='o')
+    plt.title('Correct Rate over Time')
+    plt.xlabel('Time')
+    plt.ylabel('Correct Rate')
+    plt.grid(True)
+    plt.show()
+    return df
